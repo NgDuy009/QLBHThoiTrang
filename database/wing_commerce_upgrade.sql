@@ -1,0 +1,220 @@
+-- One-time WinG commerce upgrade. Back up fsms_db before importing.
+USE fsms_db;
+ALTER TABLE products
+ ADD COLUMN gender ENUM('men','women','unisex','kids') NOT NULL DEFAULT 'unisex',
+ ADD COLUMN collection_name VARCHAR(100) NULL,
+ ADD COLUMN material VARCHAR(150) NULL,
+ ADD COLUMN is_published TINYINT(1) NOT NULL DEFAULT 1;
+ALTER TABLE orders MODIFY user_id INT NULL;
+ALTER TABLE orders
+ ADD COLUMN source ENUM('online','pos') NOT NULL DEFAULT 'pos',
+ ADD COLUMN delivery_name VARCHAR(120) NULL,
+ ADD COLUMN delivery_phone VARCHAR(30) NULL,
+ ADD COLUMN delivery_address VARCHAR(255) NULL,
+ ADD COLUMN customer_note VARCHAR(500) NULL,
+ ADD COLUMN payment_method ENUM('cod','bank_transfer') NOT NULL DEFAULT 'cod',
+ ADD COLUMN payment_status ENUM('unpaid','paid','refunded') NOT NULL DEFAULT 'unpaid',
+ ADD COLUMN shipping_fee DECIMAL(12,2) NOT NULL DEFAULT 0;
+ALTER TABLE order_details
+ ADD COLUMN variant_id INT NULL,
+ ADD COLUMN variant_size VARCHAR(30) NULL,
+ ADD COLUMN variant_color VARCHAR(50) NULL;
+ALTER TABLE stock_transactions MODIFY user_id INT NULL;
+CREATE INDEX idx_products_storefront ON products(status,is_published,gender,category_id);
+CREATE INDEX idx_orders_customer_created ON orders(customer_id,created_at);
+
+INSERT INTO product_variants(product_id,sku,size,color,stock_quantity)
+SELECT p.id, CONCAT(p.sku,'-OS-DEFAULT'), 'One Size', 'Mặc định', p.stock_quantity
+FROM products p
+WHERE NOT EXISTS (SELECT 1 FROM product_variants v WHERE v.product_id=p.id);
+INSERT IGNORE INTO products(category_id,sku,name,description,price,cost_price,stock_quantity,image_url,status,gender,collection_name,material,is_published) SELECT id,'WG006','Áo Blazer Tailored','Thiết kế WinG Modern Essentials, chú trọng chất liệu, phom dáng và chi tiết hoàn thiện.',1299000,720000,0,'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?auto=format&fit=crop&w=900&q=85','active','men','Modern Essentials','Wool blend',1 FROM categories WHERE name='Áo' LIMIT 1;
+INSERT IGNORE INTO products(category_id,sku,name,description,price,cost_price,stock_quantity,image_url,status,gender,collection_name,material,is_published) SELECT id,'WG007','Áo Sơ Mi Oxford','Thiết kế WinG Modern Essentials, chú trọng chất liệu, phom dáng và chi tiết hoàn thiện.',589000,290000,0,'https://images.unsplash.com/photo-1596755094514-f87e34085b2c?auto=format&fit=crop&w=900&q=85','active','men','Modern Essentials','Cotton Oxford',1 FROM categories WHERE name='Áo' LIMIT 1;
+INSERT IGNORE INTO products(category_id,sku,name,description,price,cost_price,stock_quantity,image_url,status,gender,collection_name,material,is_published) SELECT id,'WG008','Áo Polo Signature','Thiết kế WinG Everyday Icons, chú trọng chất liệu, phom dáng và chi tiết hoàn thiện.',499000,240000,0,'https://images.unsplash.com/photo-1627225924765-552d49cf47ad?auto=format&fit=crop&w=900&q=85','active','men','Everyday Icons','Cotton piqué',1 FROM categories WHERE name='Áo' LIMIT 1;
+INSERT IGNORE INTO products(category_id,sku,name,description,price,cost_price,stock_quantity,image_url,status,gender,collection_name,material,is_published) SELECT id,'WG009','Áo Khoác Suede','Thiết kế WinG Autumn Edit, chú trọng chất liệu, phom dáng và chi tiết hoàn thiện.',1599000,890000,0,'https://images.unsplash.com/photo-1551028719-00167b16eac5?auto=format&fit=crop&w=900&q=85','active','men','Autumn Edit','Suede finish',1 FROM categories WHERE name='Áo' LIMIT 1;
+INSERT IGNORE INTO products(category_id,sku,name,description,price,cost_price,stock_quantity,image_url,status,gender,collection_name,material,is_published) SELECT id,'WG010','Áo Thun Monogram','Thiết kế WinG Everyday Icons, chú trọng chất liệu, phom dáng và chi tiết hoàn thiện.',329000,155000,0,'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=900&q=85','active','unisex','Everyday Icons','Cotton jersey',1 FROM categories WHERE name='Áo' LIMIT 1;
+INSERT IGNORE INTO products(category_id,sku,name,description,price,cost_price,stock_quantity,image_url,status,gender,collection_name,material,is_published) SELECT id,'WG011','Quần Tây Classic','Thiết kế WinG Modern Essentials, chú trọng chất liệu, phom dáng và chi tiết hoàn thiện.',799000,410000,0,'https://images.unsplash.com/photo-1473966968600-fa801b869a1a?auto=format&fit=crop&w=900&q=85','active','men','Modern Essentials','Poly-viscose',1 FROM categories WHERE name='Quần' LIMIT 1;
+INSERT IGNORE INTO products(category_id,sku,name,description,price,cost_price,stock_quantity,image_url,status,gender,collection_name,material,is_published) SELECT id,'WG012','Quần Chino Relaxed','Thiết kế WinG Everyday Icons, chú trọng chất liệu, phom dáng và chi tiết hoàn thiện.',699000,350000,0,'https://images.unsplash.com/photo-1517438476312-10d79c077509?auto=format&fit=crop&w=900&q=85','active','men','Everyday Icons','Cotton twill',1 FROM categories WHERE name='Quần' LIMIT 1;
+INSERT IGNORE INTO products(category_id,sku,name,description,price,cost_price,stock_quantity,image_url,status,gender,collection_name,material,is_published) SELECT id,'WG013','Quần Cargo Utility','Thiết kế WinG Urban Form, chú trọng chất liệu, phom dáng và chi tiết hoàn thiện.',749000,390000,0,'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=900&q=85','active','unisex','Urban Form','Cotton canvas',1 FROM categories WHERE name='Quần' LIMIT 1;
+INSERT IGNORE INTO products(category_id,sku,name,description,price,cost_price,stock_quantity,image_url,status,gender,collection_name,material,is_published) SELECT id,'WG014','Jeans Wide Leg','Thiết kế WinG Denim Stories, chú trọng chất liệu, phom dáng và chi tiết hoàn thiện.',699000,360000,0,'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?auto=format&fit=crop&w=900&q=85','active','women','Denim Stories','Denim',1 FROM categories WHERE name='Quần' LIMIT 1;
+INSERT IGNORE INTO products(category_id,sku,name,description,price,cost_price,stock_quantity,image_url,status,gender,collection_name,material,is_published) SELECT id,'WG015','Quần Short Linen','Thiết kế WinG Summer Light, chú trọng chất liệu, phom dáng và chi tiết hoàn thiện.',429000,210000,0,'https://images.unsplash.com/photo-1591195853828-11db59a44f6b?auto=format&fit=crop&w=900&q=85','active','unisex','Summer Light','Linen blend',1 FROM categories WHERE name='Quần' LIMIT 1;
+INSERT IGNORE INTO products(category_id,sku,name,description,price,cost_price,stock_quantity,image_url,status,gender,collection_name,material,is_published) SELECT id,'WG016','Đầm Satin Evening','Thiết kế WinG Evening Atelier, chú trọng chất liệu, phom dáng và chi tiết hoàn thiện.',1199000,620000,0,'https://images.unsplash.com/photo-1566174053879-31528523f8ae?auto=format&fit=crop&w=900&q=85','active','women','Evening Atelier','Silk-touch satin',1 FROM categories WHERE name='Váy & Đầm' LIMIT 1;
+INSERT IGNORE INTO products(category_id,sku,name,description,price,cost_price,stock_quantity,image_url,status,gender,collection_name,material,is_published) SELECT id,'WG017','Đầm Shirt Dress','Thiết kế WinG Modern Muse, chú trọng chất liệu, phom dáng và chi tiết hoàn thiện.',899000,470000,0,'https://images.unsplash.com/photo-1595777457583-95e059d581b8?auto=format&fit=crop&w=900&q=85','active','women','Modern Muse','Cotton poplin',1 FROM categories WHERE name='Váy & Đầm' LIMIT 1;
+INSERT IGNORE INTO products(category_id,sku,name,description,price,cost_price,stock_quantity,image_url,status,gender,collection_name,material,is_published) SELECT id,'WG018','Chân Váy Pleated','Thiết kế WinG Modern Muse, chú trọng chất liệu, phom dáng và chi tiết hoàn thiện.',629000,320000,0,'https://images.unsplash.com/photo-1583496661160-fb5886a0aaaa?auto=format&fit=crop&w=900&q=85','active','women','Modern Muse','Poly crepe',1 FROM categories WHERE name='Váy & Đầm' LIMIT 1;
+INSERT IGNORE INTO products(category_id,sku,name,description,price,cost_price,stock_quantity,image_url,status,gender,collection_name,material,is_published) SELECT id,'WG019','Váy Knit Midi','Thiết kế WinG Soft Structure, chú trọng chất liệu, phom dáng và chi tiết hoàn thiện.',859000,440000,0,'https://images.unsplash.com/photo-1572804013427-4d7ca7268217?auto=format&fit=crop&w=900&q=85','active','women','Soft Structure','Viscose knit',1 FROM categories WHERE name='Váy & Đầm' LIMIT 1;
+INSERT IGNORE INTO products(category_id,sku,name,description,price,cost_price,stock_quantity,image_url,status,gender,collection_name,material,is_published) SELECT id,'WG020','Đầm Minimal Black','Thiết kế WinG Evening Atelier, chú trọng chất liệu, phom dáng và chi tiết hoàn thiện.',999000,510000,0,'https://images.unsplash.com/photo-1566174053879-31528523f8ae?auto=format&fit=crop&w=900&q=85','active','women','Evening Atelier','Crepe',1 FROM categories WHERE name='Váy & Đầm' LIMIT 1;
+INSERT IGNORE INTO products(category_id,sku,name,description,price,cost_price,stock_quantity,image_url,status,gender,collection_name,material,is_published) SELECT id,'WG021','Áo Blouse Silk Touch','Thiết kế WinG Modern Muse, chú trọng chất liệu, phom dáng và chi tiết hoàn thiện.',699000,350000,0,'https://images.unsplash.com/photo-1564257577-6a1b8a0f6b5e?auto=format&fit=crop&w=900&q=85','active','women','Modern Muse','Silk-touch polyester',1 FROM categories WHERE name='Áo' LIMIT 1;
+INSERT IGNORE INTO products(category_id,sku,name,description,price,cost_price,stock_quantity,image_url,status,gender,collection_name,material,is_published) SELECT id,'WG022','Áo Cardigan Soft Knit','Thiết kế WinG Soft Structure, chú trọng chất liệu, phom dáng và chi tiết hoàn thiện.',759000,390000,0,'https://images.unsplash.com/photo-1618354691373-d851c5c3a990?auto=format&fit=crop&w=900&q=85','active','unisex','Soft Structure','Soft knit',1 FROM categories WHERE name='Áo' LIMIT 1;
+INSERT IGNORE INTO products(category_id,sku,name,description,price,cost_price,stock_quantity,image_url,status,gender,collection_name,material,is_published) SELECT id,'WG023','Áo Khoác Trench','Thiết kế WinG Outerwear, chú trọng chất liệu, phom dáng và chi tiết hoàn thiện.',1899000,1050000,0,'https://images.unsplash.com/photo-1548624149-f3e2e8f3f5c5?auto=format&fit=crop&w=900&q=85','active','women','Outerwear','Water-resistant cotton',1 FROM categories WHERE name='Áo' LIMIT 1;
+INSERT IGNORE INTO products(category_id,sku,name,description,price,cost_price,stock_quantity,image_url,status,gender,collection_name,material,is_published) SELECT id,'WG024','Áo Gile Tailored','Thiết kế WinG Modern Muse, chú trọng chất liệu, phom dáng và chi tiết hoàn thiện.',729000,370000,0,'https://images.unsplash.com/photo-1591369822096-ffd140ec948f?auto=format&fit=crop&w=900&q=85','active','women','Modern Muse','Suiting fabric',1 FROM categories WHERE name='Áo' LIMIT 1;
+INSERT IGNORE INTO products(category_id,sku,name,description,price,cost_price,stock_quantity,image_url,status,gender,collection_name,material,is_published) SELECT id,'WG025','Túi Shoulder Mini','Thiết kế WinG Accessories, chú trọng chất liệu, phom dáng và chi tiết hoàn thiện.',899000,470000,0,'https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&w=900&q=85','active','women','Accessories','Vegan leather',1 FROM categories WHERE name='Phụ kiện' LIMIT 1;
+INSERT IGNORE INTO products(category_id,sku,name,description,price,cost_price,stock_quantity,image_url,status,gender,collection_name,material,is_published) SELECT id,'WG026','Túi Crossbody Noir','Thiết kế WinG Accessories, chú trọng chất liệu, phom dáng và chi tiết hoàn thiện.',1099000,580000,0,'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?auto=format&fit=crop&w=900&q=85','active','unisex','Accessories','Textured leather',1 FROM categories WHERE name='Phụ kiện' LIMIT 1;
+INSERT IGNORE INTO products(category_id,sku,name,description,price,cost_price,stock_quantity,image_url,status,gender,collection_name,material,is_published) SELECT id,'WG027','Thắt Lưng Leather','Thiết kế WinG Accessories, chú trọng chất liệu, phom dáng và chi tiết hoàn thiện.',399000,190000,0,'https://images.unsplash.com/photo-1624222247344-550fb8c7b6e8?auto=format&fit=crop&w=900&q=85','active','unisex','Accessories','Genuine leather',1 FROM categories WHERE name='Phụ kiện' LIMIT 1;
+INSERT IGNORE INTO products(category_id,sku,name,description,price,cost_price,stock_quantity,image_url,status,gender,collection_name,material,is_published) SELECT id,'WG028','Khăn Lụa Monogram','Thiết kế WinG Accessories, chú trọng chất liệu, phom dáng và chi tiết hoàn thiện.',359000,165000,0,'https://images.unsplash.com/photo-1601924994987-69e26d50dc26?auto=format&fit=crop&w=900&q=85','active','women','Accessories','Silk blend',1 FROM categories WHERE name='Phụ kiện' LIMIT 1;
+INSERT IGNORE INTO products(category_id,sku,name,description,price,cost_price,stock_quantity,image_url,status,gender,collection_name,material,is_published) SELECT id,'WG029','Nón Cap Classic','Thiết kế WinG Everyday Icons, chú trọng chất liệu, phom dáng và chi tiết hoàn thiện.',289000,125000,0,'https://images.unsplash.com/photo-1588850561407-ed78c282e89b?auto=format&fit=crop&w=900&q=85','active','unisex','Everyday Icons','Cotton twill',1 FROM categories WHERE name='Phụ kiện' LIMIT 1;
+INSERT IGNORE INTO products(category_id,sku,name,description,price,cost_price,stock_quantity,image_url,status,gender,collection_name,material,is_published) SELECT id,'WG030','Ví Card Holder','Thiết kế WinG Accessories, chú trọng chất liệu, phom dáng và chi tiết hoàn thiện.',459000,220000,0,'https://images.unsplash.com/photo-1627123424574-724758594e93?auto=format&fit=crop&w=900&q=85','active','unisex','Accessories','Vegan leather',1 FROM categories WHERE name='Phụ kiện' LIMIT 1;
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG006-S-1','S','Đen',1 FROM products WHERE sku='WG006';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG006-M-1','M','Đen',2 FROM products WHERE sku='WG006';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG006-L-1','L','Đen',2 FROM products WHERE sku='WG006';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG006-XL-1','XL','Đen',1 FROM products WHERE sku='WG006';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG006-S-2','S','Trắng',1 FROM products WHERE sku='WG006';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG006-M-2','M','Trắng',2 FROM products WHERE sku='WG006';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG006-L-2','L','Trắng',2 FROM products WHERE sku='WG006';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG006-XL-2','XL','Trắng',1 FROM products WHERE sku='WG006';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG007-S-1','S','Trắng',1 FROM products WHERE sku='WG007';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG007-M-1','M','Trắng',2 FROM products WHERE sku='WG007';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG007-L-1','L','Trắng',2 FROM products WHERE sku='WG007';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG007-XL-1','XL','Trắng',1 FROM products WHERE sku='WG007';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG007-S-2','S','Xanh navy',1 FROM products WHERE sku='WG007';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG007-M-2','M','Xanh navy',2 FROM products WHERE sku='WG007';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG007-L-2','L','Xanh navy',2 FROM products WHERE sku='WG007';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG007-XL-2','XL','Xanh navy',1 FROM products WHERE sku='WG007';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG008-S-1','S','Trắng',1 FROM products WHERE sku='WG008';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG008-M-1','M','Trắng',2 FROM products WHERE sku='WG008';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG008-L-1','L','Trắng',2 FROM products WHERE sku='WG008';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG008-XL-1','XL','Trắng',1 FROM products WHERE sku='WG008';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG008-S-2','S','Xanh navy',1 FROM products WHERE sku='WG008';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG008-M-2','M','Xanh navy',2 FROM products WHERE sku='WG008';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG008-L-2','L','Xanh navy',2 FROM products WHERE sku='WG008';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG008-XL-2','XL','Xanh navy',1 FROM products WHERE sku='WG008';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG009-S-1','S','Trắng',1 FROM products WHERE sku='WG009';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG009-M-1','M','Trắng',2 FROM products WHERE sku='WG009';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG009-L-1','L','Trắng',2 FROM products WHERE sku='WG009';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG009-XL-1','XL','Trắng',1 FROM products WHERE sku='WG009';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG009-S-2','S','Xanh navy',1 FROM products WHERE sku='WG009';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG009-M-2','M','Xanh navy',2 FROM products WHERE sku='WG009';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG009-L-2','L','Xanh navy',2 FROM products WHERE sku='WG009';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG009-XL-2','XL','Xanh navy',1 FROM products WHERE sku='WG009';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG010-XS-1','XS','Đen',1 FROM products WHERE sku='WG010';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG010-S-1','S','Đen',2 FROM products WHERE sku='WG010';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG010-M-1','M','Đen',2 FROM products WHERE sku='WG010';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG010-L-1','L','Đen',1 FROM products WHERE sku='WG010';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG010-XS-2','XS','Trắng',1 FROM products WHERE sku='WG010';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG010-S-2','S','Trắng',2 FROM products WHERE sku='WG010';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG010-M-2','M','Trắng',2 FROM products WHERE sku='WG010';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG010-L-2','L','Trắng',1 FROM products WHERE sku='WG010';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG011-S-1','S','Đen',1 FROM products WHERE sku='WG011';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG011-M-1','M','Đen',2 FROM products WHERE sku='WG011';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG011-L-1','L','Đen',2 FROM products WHERE sku='WG011';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG011-XL-1','XL','Đen',1 FROM products WHERE sku='WG011';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG011-S-2','S','Trắng',1 FROM products WHERE sku='WG011';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG011-M-2','M','Trắng',2 FROM products WHERE sku='WG011';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG011-L-2','L','Trắng',2 FROM products WHERE sku='WG011';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG011-XL-2','XL','Trắng',1 FROM products WHERE sku='WG011';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG012-S-1','S','Trắng',1 FROM products WHERE sku='WG012';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG012-M-1','M','Trắng',2 FROM products WHERE sku='WG012';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG012-L-1','L','Trắng',2 FROM products WHERE sku='WG012';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG012-XL-1','XL','Trắng',1 FROM products WHERE sku='WG012';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG012-S-2','S','Xanh navy',1 FROM products WHERE sku='WG012';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG012-M-2','M','Xanh navy',2 FROM products WHERE sku='WG012';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG012-L-2','L','Xanh navy',2 FROM products WHERE sku='WG012';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG012-XL-2','XL','Xanh navy',1 FROM products WHERE sku='WG012';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG013-XS-1','XS','Be',1 FROM products WHERE sku='WG013';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG013-S-1','S','Be',2 FROM products WHERE sku='WG013';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG013-M-1','M','Be',2 FROM products WHERE sku='WG013';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG013-L-1','L','Be',1 FROM products WHERE sku='WG013';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG013-XS-2','XS','Đen',1 FROM products WHERE sku='WG013';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG013-S-2','S','Đen',2 FROM products WHERE sku='WG013';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG013-M-2','M','Đen',2 FROM products WHERE sku='WG013';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG013-L-2','L','Đen',1 FROM products WHERE sku='WG013';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG014-XS-1','XS','Be',1 FROM products WHERE sku='WG014';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG014-S-1','S','Be',2 FROM products WHERE sku='WG014';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG014-M-1','M','Be',2 FROM products WHERE sku='WG014';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG014-L-1','L','Be',1 FROM products WHERE sku='WG014';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG014-XS-2','XS','Đen',1 FROM products WHERE sku='WG014';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG014-S-2','S','Đen',2 FROM products WHERE sku='WG014';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG014-M-2','M','Đen',2 FROM products WHERE sku='WG014';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG014-L-2','L','Đen',1 FROM products WHERE sku='WG014';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG015-XS-1','XS','Be',1 FROM products WHERE sku='WG015';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG015-S-1','S','Be',2 FROM products WHERE sku='WG015';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG015-M-1','M','Be',2 FROM products WHERE sku='WG015';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG015-L-1','L','Be',1 FROM products WHERE sku='WG015';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG015-XS-2','XS','Đen',1 FROM products WHERE sku='WG015';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG015-S-2','S','Đen',2 FROM products WHERE sku='WG015';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG015-M-2','M','Đen',2 FROM products WHERE sku='WG015';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG015-L-2','L','Đen',1 FROM products WHERE sku='WG015';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG016-XS-1','XS','Đen',1 FROM products WHERE sku='WG016';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG016-S-1','S','Đen',2 FROM products WHERE sku='WG016';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG016-M-1','M','Đen',2 FROM products WHERE sku='WG016';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG016-L-1','L','Đen',1 FROM products WHERE sku='WG016';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG016-XS-2','XS','Trắng',1 FROM products WHERE sku='WG016';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG016-S-2','S','Trắng',2 FROM products WHERE sku='WG016';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG016-M-2','M','Trắng',2 FROM products WHERE sku='WG016';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG016-L-2','L','Trắng',1 FROM products WHERE sku='WG016';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG017-XS-1','XS','Be',1 FROM products WHERE sku='WG017';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG017-S-1','S','Be',2 FROM products WHERE sku='WG017';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG017-M-1','M','Be',2 FROM products WHERE sku='WG017';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG017-L-1','L','Be',1 FROM products WHERE sku='WG017';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG017-XS-2','XS','Đen',1 FROM products WHERE sku='WG017';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG017-S-2','S','Đen',2 FROM products WHERE sku='WG017';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG017-M-2','M','Đen',2 FROM products WHERE sku='WG017';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG017-L-2','L','Đen',1 FROM products WHERE sku='WG017';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG018-XS-1','XS','Be',1 FROM products WHERE sku='WG018';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG018-S-1','S','Be',2 FROM products WHERE sku='WG018';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG018-M-1','M','Be',2 FROM products WHERE sku='WG018';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG018-L-1','L','Be',1 FROM products WHERE sku='WG018';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG018-XS-2','XS','Đen',1 FROM products WHERE sku='WG018';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG018-S-2','S','Đen',2 FROM products WHERE sku='WG018';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG018-M-2','M','Đen',2 FROM products WHERE sku='WG018';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG018-L-2','L','Đen',1 FROM products WHERE sku='WG018';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG019-XS-1','XS','Be',1 FROM products WHERE sku='WG019';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG019-S-1','S','Be',2 FROM products WHERE sku='WG019';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG019-M-1','M','Be',2 FROM products WHERE sku='WG019';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG019-L-1','L','Be',1 FROM products WHERE sku='WG019';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG019-XS-2','XS','Đen',1 FROM products WHERE sku='WG019';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG019-S-2','S','Đen',2 FROM products WHERE sku='WG019';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG019-M-2','M','Đen',2 FROM products WHERE sku='WG019';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG019-L-2','L','Đen',1 FROM products WHERE sku='WG019';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG020-XS-1','XS','Đen',1 FROM products WHERE sku='WG020';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG020-S-1','S','Đen',2 FROM products WHERE sku='WG020';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG020-M-1','M','Đen',2 FROM products WHERE sku='WG020';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG020-L-1','L','Đen',1 FROM products WHERE sku='WG020';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG020-XS-2','XS','Trắng',1 FROM products WHERE sku='WG020';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG020-S-2','S','Trắng',2 FROM products WHERE sku='WG020';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG020-M-2','M','Trắng',2 FROM products WHERE sku='WG020';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG020-L-2','L','Trắng',1 FROM products WHERE sku='WG020';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG021-XS-1','XS','Be',1 FROM products WHERE sku='WG021';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG021-S-1','S','Be',2 FROM products WHERE sku='WG021';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG021-M-1','M','Be',2 FROM products WHERE sku='WG021';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG021-L-1','L','Be',1 FROM products WHERE sku='WG021';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG021-XS-2','XS','Đen',1 FROM products WHERE sku='WG021';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG021-S-2','S','Đen',2 FROM products WHERE sku='WG021';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG021-M-2','M','Đen',2 FROM products WHERE sku='WG021';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG021-L-2','L','Đen',1 FROM products WHERE sku='WG021';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG022-XS-1','XS','Be',1 FROM products WHERE sku='WG022';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG022-S-1','S','Be',2 FROM products WHERE sku='WG022';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG022-M-1','M','Be',2 FROM products WHERE sku='WG022';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG022-L-1','L','Be',1 FROM products WHERE sku='WG022';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG022-XS-2','XS','Đen',1 FROM products WHERE sku='WG022';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG022-S-2','S','Đen',2 FROM products WHERE sku='WG022';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG022-M-2','M','Đen',2 FROM products WHERE sku='WG022';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG022-L-2','L','Đen',1 FROM products WHERE sku='WG022';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG023-XS-1','XS','Be',1 FROM products WHERE sku='WG023';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG023-S-1','S','Be',2 FROM products WHERE sku='WG023';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG023-M-1','M','Be',2 FROM products WHERE sku='WG023';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG023-L-1','L','Be',1 FROM products WHERE sku='WG023';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG023-XS-2','XS','Đen',1 FROM products WHERE sku='WG023';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG023-S-2','S','Đen',2 FROM products WHERE sku='WG023';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG023-M-2','M','Đen',2 FROM products WHERE sku='WG023';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG023-L-2','L','Đen',1 FROM products WHERE sku='WG023';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG024-XS-1','XS','Be',1 FROM products WHERE sku='WG024';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG024-S-1','S','Be',2 FROM products WHERE sku='WG024';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG024-M-1','M','Be',2 FROM products WHERE sku='WG024';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG024-L-1','L','Be',1 FROM products WHERE sku='WG024';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG024-XS-2','XS','Đen',1 FROM products WHERE sku='WG024';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG024-S-2','S','Đen',2 FROM products WHERE sku='WG024';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG024-M-2','M','Đen',2 FROM products WHERE sku='WG024';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG024-L-2','L','Đen',1 FROM products WHERE sku='WG024';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG025-OneSize-1','One Size','Đen',2 FROM products WHERE sku='WG025';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG025-OneSize-2','One Size','Nâu',2 FROM products WHERE sku='WG025';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG026-OneSize-1','One Size','Đen',2 FROM products WHERE sku='WG026';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG026-OneSize-2','One Size','Nâu',2 FROM products WHERE sku='WG026';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG027-OneSize-1','One Size','Đen',2 FROM products WHERE sku='WG027';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG027-OneSize-2','One Size','Nâu',2 FROM products WHERE sku='WG027';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG028-OneSize-1','One Size','Be',2 FROM products WHERE sku='WG028';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG028-OneSize-2','One Size','Kem',2 FROM products WHERE sku='WG028';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG029-OneSize-1','One Size','Be',2 FROM products WHERE sku='WG029';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG029-OneSize-2','One Size','Kem',2 FROM products WHERE sku='WG029';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG030-OneSize-1','One Size','Đen',2 FROM products WHERE sku='WG030';
+INSERT IGNORE INTO product_variants(product_id,sku,size,color,stock_quantity) SELECT id,'WG030-OneSize-2','One Size','Nâu',2 FROM products WHERE sku='WG030';
+UPDATE products p
+SET p.stock_quantity=(SELECT COALESCE(SUM(v.stock_quantity),0) FROM product_variants v WHERE v.product_id=p.id);

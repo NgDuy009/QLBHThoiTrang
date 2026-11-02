@@ -1,0 +1,4 @@
+Options -Indexes
+<FilesMatch "^(README\.md|\.env|composer\.(json|lock))$">
+    Require all denied
+</FilesMatch>

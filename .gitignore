@@ -1,0 +1,15 @@
+/uploads/*
+!/uploads/.gitkeep
+.env
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+*.bak
+/cache/
+/logs/
+/sessions/
+/backups/
+/database/*backup*.sql
+/database/*dump*.sql
+*.sql.gz
