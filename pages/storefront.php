@@ -285,7 +285,7 @@ function wing_img(?string $url):string{
 <link rel="apple-touch-icon" href="<?= BASE_URL ?>/assets/images/wing-favicon.png?v=wing-v4">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/style.css?v=wing-v5-editorial"></head><body class="storefront">
+<link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/style.css?v=wing-v6-hero-landscape"></head><body class="storefront">
 <?php require __DIR__ . '/../includes/wing_intro.php'; ?>
 <header class="store-header">
  <a class="store-brand" href="<?= BASE_URL ?>/index.php?page=shop"><span>W</span><b>WinG<small>THE FASHION HOUSE</small></b></a>
