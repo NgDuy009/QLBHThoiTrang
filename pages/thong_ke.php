@@ -22,7 +22,9 @@ $max_doanh_thu = max(array_column($du_lieu_thang, 'doanh_thu'));
         body { font-family: Arial, sans-serif; background: #f4f6f9; margin: 0; padding: 20px; }
         .container { max-width: 1000px; margin: auto; background: #fff; padding: 25px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
         .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #2c3e50; padding-bottom: 12px; margin-bottom: 25px; }
-        .btn-print { background: #27ae60; color: #fff; border: none; padding: 10px 18px; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        .btn-group { display: flex; gap: 10px; }
+        .btn-print { background: #27ae60; color: #fff; border: none; padding: 10px 16px; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        .btn-excel { background: #2980b9; color: #fff; border: none; padding: 10px 16px; border-radius: 5px; cursor: pointer; font-weight: bold; }
         .cards { display: flex; gap: 20px; margin-bottom: 30px; flex-wrap: wrap; }
         .card { flex: 1; min-width: 200px; background: #3498db; color: #fff; padding: 20px; border-radius: 8px; }
         .card.green { background: #2ecc71; }
@@ -35,7 +37,9 @@ $max_doanh_thu = max(array_column($du_lieu_thang, 'doanh_thu'));
         .bar:hover { background: #2980b9; }
         .bar-value { font-size: 12px; font-weight: bold; margin-bottom: 5px; color: #333; }
         .bar-label { margin-top: 8px; font-size: 13px; font-weight: bold; color: #555; }
-        table { width: 100%; border-collapse: collapse; margin-top: 30px; }
+        .filter-box { margin-top: 30px; display: flex; justify-content: space-between; align-items: center; }
+        .search-input { padding: 8px 12px; width: 260px; border: 1px solid #ccc; border-radius: 5px; font-size: 14px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
         th, td { border: 1px solid #ddd; padding: 12px; text-align: center; }
         th { background-color: #2c3e50; color: white; }
     </style>
@@ -44,7 +48,10 @@ $max_doanh_thu = max(array_column($du_lieu_thang, 'doanh_thu'));
 <div class="container">
     <div class="header">
         <h2>Báo Cáo Thống Kê Doanh Thu Cửa Hàng Thời Trang</h2>
-        <button class="btn-print" onclick="window.print()">In / Xuất Báo Cáo</button>
+        <div class="btn-group">
+            <button class="btn-excel" onclick="xuatExcel()">Xuất File Excel (CSV)</button>
+            <button class="btn-print" onclick="window.print()">In / Xuất PDF</button>
+        </div>
     </div>
 
     <div class="cards">
@@ -75,7 +82,12 @@ $max_doanh_thu = max(array_column($du_lieu_thang, 'doanh_thu'));
         <?php endforeach; ?>
     </div>
 
-    <table>
+    <div class="filter-box">
+        <h3>Chi Tiết Doanh Thu Theo Tháng</h3>
+        <input type="text" id="searchMonth" class="search-input" onkeyup="locThang()" placeholder="Nhập tên tháng để lọc (VD: Tháng 5)...">
+    </div>
+
+    <table id="revenueTable">
         <thead>
             <tr>
                 <th>Thời Gian</th>
@@ -94,5 +106,35 @@ $max_doanh_thu = max(array_column($du_lieu_thang, 'doanh_thu'));
         </tbody>
     </table>
 </div>
+
+<script>
+function locThang() {
+    let input = document.getElementById("searchMonth").value.toLowerCase();
+    let rows = document.querySelectorAll("#revenueTable tbody tr");
+    rows.forEach(row => {
+        let text = row.cells[0].textContent.toLowerCase();
+        row.style.display = text.includes(input) ? "" : "none";
+    });
+}
+
+function xuatExcel() {
+    let csv = [];
+    let rows = document.querySelectorAll("#revenueTable tr");
+    for (let i = 0; i < rows.length; i++) {
+        let row = [], cols = rows[i].querySelectorAll("td, th");
+        for (let j = 0; j < cols.length; j++) {
+            row.push('"' + cols[j].innerText + '"');
+        }
+        csv.push(row.join(","));
+    }
+    let csvFile = new Blob(["\uFEFF" + csv.join("\n")], {type: "text/csv;charset=utf-8;"});
+    let downloadLink = document.createElement("a");
+    downloadLink.download = "bao_cao_doanh_thu.csv";
+    downloadLink.href = window.URL.createObjectURL(csvFile);
+    downloadLink.style.display = "none";
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+}
+</script>
 </body>
 </html>
