@@ -13,3 +13,5 @@ Thumbs.db
 /database/*backup*.sql
 /database/*dump*.sql
 *.sql.gz
+/config/payment.php
+/generate_hash.php
