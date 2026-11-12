@@ -103,7 +103,7 @@ $statusLabels=['pending'=>'Đã đặt hàng','confirmed'=>'Đã xác nhận','s
  <h1>Đã gửi mã xác nhận</h1><p>WinG đang kiểm tra thông tin chuyển khoản của đơn <?= e($mobileOrder['order_code']) ?>.</p><a class="wing-mobile-submit" href="<?= BASE_URL ?>/index.php?page=payment_mobile&amp;token=<?= e($token) ?>&amp;step=tracking">XEM TIẾN TRÌNH ĐƠN HÀNG ↗</a>
 <?php else: ?>
  <h1>Nhập nội dung chuyển khoản</h1>
- <p>Sau khi chuyển khoản trong ứng dụng ngân hàng bằng <b>QR VietQR TCB</b>, nhập đúng 8 ký tự trong phần nội dung chuyển khoản. Khi hợp lệ, WinG sẽ tự ghi nhận yêu cầu và chuyển bạn tới trang theo dõi đơn.</p>
+ <p>Sau khi chuyển khoản theo thông tin tài khoản ngân hàng của đơn hàng, nhập đúng 8 ký tự trong phần nội dung chuyển khoản. Khi hợp lệ, WinG sẽ tự ghi nhận yêu cầu và chuyển bạn tới trang theo dõi đơn.</p>
  <div class="wing-mobile-info"><small>MÃ ĐƠN HÀNG</small><strong><?= e($mobileOrder['order_code']) ?></strong><small>SỐ TIỀN ĐƠN HÀNG</small><strong><?= money($mobileOrder['total_amount']) ?></strong></div>
  <?php if ($mobileError): ?><div class="wing-mobile-notice error" role="alert"><?= e($mobileError) ?></div><?php endif; ?>
  <?php if($mobileOrder['status']==='cancelled'): ?><div class="wing-mobile-notice error">Đơn đã hủy, không gửi xác nhận.</div>

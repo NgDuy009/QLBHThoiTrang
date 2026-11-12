@@ -1203,3 +1203,15 @@ tr:hover .product-admin-thumb{transform:scale(1.06);box-shadow:0 5px 16px #1d2a2
 .storefront .wing-variant-image-wrap img{will-change:auto}
 .storefront .wing-image-color-note{display:none!important}
 @media(prefers-reduced-motion:reduce){.wing-save-product,.palette-color-card,.product-admin-thumb{transition:none!important;transform:none!important}.wing-save-product.is-saving .wing-save-icon{animation:none}}
+
+
+/* WinG camera confirmation: one visible QR and a directly opening form action */
+.wing-camera-only-qr{align-content:start;gap:14px;border-radius:12px;padding:18px 14px;box-shadow:inset 0 0 0 1px rgba(32,59,43,.06)}
+.wing-camera-toolbar{display:grid;justify-items:center;gap:9px;width:100%}
+.wing-camera-label{font:800 9px/1.5 'Manrope',sans-serif;letter-spacing:1.5px;color:#967a4f}
+.wing-camera-open{display:flex;align-items:center;justify-content:center;width:100%;padding:13px 12px;min-height:45px;border:1px solid #1e3729;border-radius:5px;color:#fff;background:#1e3729;font:800 10px/1.4 'Manrope',sans-serif;letter-spacing:.45px;text-align:center;transition:background-color .18s ease,box-shadow .18s ease,transform .18s ease}
+.wing-camera-open:hover{color:#fff;background:#345640;transform:translateY(-2px);box-shadow:0 8px 18px rgba(30,55,41,.16)}
+.wing-camera-open:focus-visible{outline:3px solid #b99a68;outline-offset:3px}
+.wing-camera-qr{min-height:265px;align-items:center;justify-content:center}
+.wing-camera-unavailable{font:600 11px/1.8 'Manrope',sans-serif;padding:18px;min-height:200px}
+@media(prefers-reduced-motion:reduce){.wing-camera-open{transition:none}.wing-camera-open:hover{transform:none}}

@@ -415,7 +415,7 @@ function wing_img(?string $url):string{
 <link rel="apple-touch-icon" href="<?= BASE_URL ?>/assets/images/wing-favicon.png?v=wing-v4">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/style.css?v=wing-20261112-speed-clean-v2"></head><body class="storefront">
+<link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/style.css?v=wing-20261112-camera-only-v1"></head><body class="storefront">
 <?php if ($page === 'shop' && !isset($_GET['q']) && !isset($_GET['category'])) require __DIR__ . '/../includes/wing_intro.php'; ?>
 <header class="store-header">
  <a class="store-brand" href="<?= BASE_URL ?>/index.php?page=shop"><span>W</span><b>WinG<small>THE FASHION HOUSE</small></b></a>
@@ -749,17 +749,15 @@ radios.forEach(r=>r.addEventListener('change',render));render();})();
  <?php else: ?>
  <div class="bank-payment-panel"><span class="store-kicker">SECURE CHECKOUT / BANK TRANSFER</span><h2>Thanh toán chuyển khoản</h2>
  <div class="bank-payment-layout">
-  <?php $qr=wing_bank_qr_url((int)$orderDetail['total_amount'],(string)$orderDetail['payment_reference']); ?>
-  <div class="bank-payment-qr wing-dual-mode-qr" id="wingQrMode" <?= $mobileConfirmationLanUrl?'data-mobile-url="'.e($mobileConfirmationLanUrl).'"':'' ?>>
-   <?php if($mobileConfirmationLanUrl): ?>
-   <div class="wing-qr-modes" role="group" aria-label="Chọn kiểu quét QR">
-    <button type="button" class="wing-qr-mode-button is-selected" data-wing-qr-mode="phone" aria-pressed="true">CAMERA IPHONE / MỞ FORM</button>
-    <button type="button" class="wing-qr-mode-button" data-wing-qr-mode="bank" aria-pressed="false">QR TCB / CHUYỂN KHOẢN</button>
+  <div class="bank-payment-qr wing-camera-only-qr" id="wingQrMode" <?= $mobileConfirmationLanUrl?'data-mobile-url="'.e($mobileConfirmationLanUrl).'"':'' ?>>
+   <div class="wing-camera-toolbar">
+    <span class="wing-camera-label">XÁC NHẬN ĐƠN HÀNG</span>
+    <?php if($mobileConfirmationUrl): ?><a class="wing-camera-open wing-mobile-popup-link" href="<?= e($mobileConfirmationUrl) ?>" target="_blank" rel="noopener">CAMERA IPHONE / MỞ FORM ↗</a><?php endif; ?>
    </div>
-   <div class="wing-qr-panel" data-wing-qr-panel="phone"><div id="wingMobileLinkQr" role="img" aria-label="Mã QR mở trang nhập mã WinG trên iPhone"></div></div>
-   <div class="wing-qr-panel" data-wing-qr-panel="bank" hidden><?php if($qr): ?><img src="<?= e($qr) ?>" alt="Mã QR TCB VietQR chuyển khoản" referrerpolicy="no-referrer" loading="lazy"><?php else: ?><div class="qr-unavailable">QR ngân hàng chưa cấu hình</div><?php endif; ?></div>
+   <?php if($mobileConfirmationLanUrl): ?>
+    <div class="wing-qr-panel wing-camera-qr"><div id="wingMobileLinkQr" role="img" aria-label="Quét bằng camera iPhone để mở trang xác nhận 8 ký tự"></div></div>
    <?php else: ?>
-   <?php if($qr): ?><img src="<?= e($qr) ?>" alt="Mã QR TCB VietQR chuyển khoản" referrerpolicy="no-referrer" loading="lazy"><?php else: ?><div class="qr-unavailable">QR chưa cấu hình</div><?php endif; ?>
+    <div class="qr-unavailable wing-camera-unavailable">Để camera iPhone quét mở form, Admin cần cấu hình địa chỉ LAN tại mục Ngân hàng & QR.</div>
    <?php endif; ?>
   </div>
   <div class="bank-payment-data"><p><small>NGÂN HÀNG</small><b><?= e(wing_bank_details()['bank_id']?:'Chưa cấu hình') ?></b></p><p><small>CHỦ TÀI KHOẢN</small><b><?= e(wing_bank_details()['account_holder']?:'Chưa cấu hình') ?></b></p><p><small>SỐ TÀI KHOẢN</small><b><?= e(wing_bank_details()['account_number']?:'Chưa cấu hình') ?></b></p><p><small>SỐ TIỀN</small><b><?= money($orderDetail['total_amount']) ?></b></p><p><small>NỘI DUNG CHUYỂN KHOẢN (8 KÝ TỰ)</small><b class="payment-reference" id="wingPaymentReference"><?= e($orderDetail['payment_reference']) ?></b></p><button type="button" class="store-outline" data-copy-reference="wingPaymentReference">SAO CHÉP NỘI DUNG ↗</button></div>
@@ -768,12 +766,11 @@ radios.forEach(r=>r.addEventListener('change',render));render();})();
  <div class="mobile-confirm-section">
   <span class="store-kicker">STEP 02 / WIN G CONFIRMATION</span>
   <h3>Xác nhận mã chuyển khoản trên điện thoại</h3>
-  <p>Chuyển khoản bằng QR TCB qua ứng dụng ngân hàng; sau đó quét mã ở chế độ <b>CAMERA IPHONE</b> để Safari mở trực tiếp trang nhập mã. Nhập đủ 8 ký tự, nhấn <b>GỬI XÁC NHẬN</b>; đơn tự chuyển sang trạng thái chờ đối soát. <b>Không cần sao chép link hoặc mã xác nhận mới.</b></p>
+  <p>Chuyển khoản theo thông tin ngân hàng và mã 8 ký tự của đơn hàng. Sau đó quét QR Camera iPhone phía trên để mở form trong Safari, nhập đúng 8 ký tự và nhấn <b>GỬI XÁC NHẬN</b>. Hệ thống sẽ ghi nhận yêu cầu chờ đối soát, không tự xác nhận đã nhận tiền.</p>
   <?php if($mobileConfirmationUrl): ?>
    <div class="mobile-confirm-single"><div class="mobile-confirm-copy">
-    <strong>01 · Chuyển khoản theo mã TCB</strong><span>Kiểm tra số tiền, chủ tài khoản và nội dung chuyển khoản <b><?= e($orderDetail['payment_reference']) ?></b> trong ứng dụng ngân hàng.</span>
-    <strong>02 · Quét bằng camera iPhone và nhập 8 ký tự</strong><span>Chọn chế độ QR mở form phía trên, quét bằng Camera iPhone. Form tự mở trong Safari; nhập đúng mã sẽ gửi yêu cầu đối soát của đơn.</span>
-    <a class="store-outline wing-mobile-popup-link" href="<?= e($mobileConfirmationUrl) ?>" target="_blank" rel="noopener">MỞ FORM NHẬP MÃ TRÊN MÁY TÍNH ↗</a>
+    <strong>01 · Chuyển khoản theo thông tin đơn hàng</strong><span>Kiểm tra người nhận, số tiền và nội dung <b><?= e($orderDetail['payment_reference']) ?></b> trong ứng dụng ngân hàng.</span>
+    <strong>02 · Mở form và gửi mã</strong><span>Quét QR bằng Camera iPhone để vào Safari hoặc nhấn nút <b>CAMERA IPHONE / MỞ FORM</b> phía trên. Nhập đúng 8 ký tự của đơn để gửi xác nhận.</span>
     <?php if(!$mobileConfirmationLanUrl): ?><small>Admin cần điền địa chỉ LAN chính xác tại Cấu hình ngân hàng để xuất hiện QR camera iPhone. Máy tính và iPhone phải truy cập được cùng mạng.</small><?php endif; ?>
    </div></div>
   <?php else: ?><p class="payment-disclaimer"><?= e($mobileConfirmationHint) ?></p><?php endif; ?>
@@ -790,7 +787,7 @@ radios.forEach(r=>r.addEventListener('change',render));render();})();
 <?php elseif($page==='customer_order_detail'): ?><section class="store-section narrow"><div class="empty-account"><h2>Không tìm thấy đơn hàng</h2><a class="store-cta" href="<?= BASE_URL ?>/index.php?page=customer_orders">QUAY LẠI ĐƠN HÀNG</a></div></section>
 <?php endif; ?>
 <footer class="store-footer"><a class="store-brand" href="<?= BASE_URL ?>/index.php?page=shop"><span>W</span><b>WinG<small>THE FASHION HOUSE</small></b></a><p>TIMELESS STYLE. CONSIDERED DETAILS.</p><small>© <?= date('Y') ?> WING FASHION HOUSE</small><a href="<?= BASE_URL ?>/index.php?page=login">STAFF PORTAL ↗</a></footer>
-<script defer src="<?= BASE_URL ?>/assets/js/wing-intro.js?v=wing-intro-v4"></script><script src="<?= BASE_URL ?>/assets/js/app.js?v=wing-v5-editorial"></script><script src="<?= BASE_URL ?>/assets/js/wing-qr-local.js?v=wing-phone-direct-1"></script><script src="<?= BASE_URL ?>/assets/js/payment.js?v=wing-phone-direct-1"></script><script src="<?= BASE_URL ?>/assets/js/wing-catalog.js?v=20261112"></script><script>
+<script defer src="<?= BASE_URL ?>/assets/js/wing-intro.js?v=wing-intro-v4"></script><script src="<?= BASE_URL ?>/assets/js/app.js?v=wing-v5-editorial"></script><script src="<?= BASE_URL ?>/assets/js/wing-qr-local.js?v=wing-phone-direct-1"></script><script src="<?= BASE_URL ?>/assets/js/payment.js?v=wing-camera-only-v1"></script><script src="<?= BASE_URL ?>/assets/js/wing-catalog.js?v=20261112"></script><script>
 (()=>{const trigger=document.querySelector('.collection-nav-trigger'),menu=document.querySelector('.collection-nav');if(!trigger||!menu)return;trigger.addEventListener('click',e=>{if(window.matchMedia('(hover: none)').matches || getComputedStyle(document.getElementById('storeMenuToggle')).display!=='none'){e.preventDefault();menu.classList.toggle('menu-open');}});document.addEventListener('click',e=>{if(!menu.contains(e.target))menu.classList.remove('menu-open');});})();
 </script>
 </body></html>

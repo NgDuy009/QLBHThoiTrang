@@ -14,7 +14,7 @@ document.querySelectorAll('[data-copy-reference]').forEach(button => {
   });
 });
 
-// Only the bank's VietQR is shown. Desktop can open a compact WinG code-entry popup.
+// The Camera / Mở form link opens the same verification form directly.
 document.querySelectorAll('.wing-mobile-popup-link').forEach(link => {
   link.addEventListener('click', event => {
     if (window.innerWidth < 680) return; // iPhone opens the responsive page normally.
@@ -63,9 +63,8 @@ if (orderWatcher) {
   }, 10000);
 }
 
-// Two QR payload types cannot be merged: VietQR is bank EMV data;
-// a regular HTTPS URL QR launches the WinG code-entry form from iPhone Camera.
-// Only one is visible at once, and all URL QR rendering occurs locally.
+// Generate one URL QR locally for the WinG verification form.
+// Bank transfers still use the recipient details shown beside it.
 (() => {
   const root=document.getElementById('wingQrMode');
   if(!root) return;
@@ -79,15 +78,5 @@ if (orderWatcher) {
   } catch(err) {
     container.textContent='Không tạo được QR mở form. Hãy sử dụng nút MỞ FORM dưới đây hoặc kiểm tra địa chỉ LAN.';
   }
-  const tabs=[...root.querySelectorAll('[data-wing-qr-mode]')];
-  const panels=[...root.querySelectorAll('[data-wing-qr-panel]')];
-  tabs.forEach(tab => tab.addEventListener('click', () => {
-    const mode=tab.getAttribute('data-wing-qr-mode');
-    tabs.forEach(item => {
-      const active=item===tab;
-      item.classList.toggle('is-selected',active);
-      item.setAttribute('aria-pressed',active?'true':'false');
-    });
-    panels.forEach(panel => {panel.hidden=panel.getAttribute('data-wing-qr-panel')!==mode;});
-  }));
+  // The single camera QR always links directly to the mobile verification form.
 })();
