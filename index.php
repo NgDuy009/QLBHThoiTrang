@@ -11,6 +11,8 @@ if (in_array($page, ['support','notifications'], true) && is_logged_in()) {
     require __DIR__ . '/includes/footer.php';
     exit;
 }
+if ($page === 'payment_mobile') { require __DIR__ . '/pages/payment_mobile.php'; exit; }
+if ($page === 'payment_status') { require __DIR__ . '/pages/payment_status.php'; exit; }
 if ($page === 'customer_login') redirect('login');
 $storefrontPages = ['shop','product','cart','checkout','customer_login','customer_register','customer_logout','customer_orders','customer_profile','wishlist','customer_order_detail','support','notifications'];
 if (in_array($page, $storefrontPages, true)) {
@@ -31,7 +33,7 @@ if ($page === 'login') {
         $identity = trim((string)($_POST['identity'] ?? ''));
         $password = (string)($_POST['password'] ?? '');
 
-        // A single sign-in form identifies staff/admin by username and customers by email.
+        // Strictly allow staff/admin accounts from users; customers from customers.
         if ($identity !== '' && login_user($identity, $password)) {
             redirect('dashboard');
         }
@@ -42,7 +44,7 @@ if ($page === 'login') {
             $customer = $stmt->fetch();
             if ($customer && $customer['account_status'] === 'active' && password_verify($password, $customer['password_hash'])) {
                 session_regenerate_id(true);
-                if (!empty($_SESSION['user'])) unset($_SESSION['wing_cart_v2']);
+                unset($_SESSION['wing_cart_v2'], $_SESSION['wing_guest_cart']);
                 unset($_SESSION['user']);
                 $_SESSION['customer_id'] = (int)$customer['id'];
                 redirect('shop');
@@ -58,7 +60,7 @@ if ($page === 'login') {
     exit;
 }
 require_login();
-$allowed = ['dashboard','products','categories','variants','customers','employees','orders','order_detail','inventory','reports'];
+$allowed = ['dashboard','products','categories','variants','customers','employees','accounts','payment_settings','orders','order_detail','inventory','reports'];
 if (!in_array($page, $allowed, true)) $page = 'dashboard';
 
 // Staff have a deliberately narrower workspace; customer sessions cannot enter this area.
@@ -69,7 +71,11 @@ if (!is_admin()) {
         redirect('dashboard');
     }
 }
-if ($page === 'employees') require_admin();
+if (in_array($page, ['employees','accounts','payment_settings'], true)) require_admin();
+if ($page === 'products' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    require __DIR__ . '/pages/products.php';
+    exit;
+}
 require __DIR__ . '/includes/header.php';
 $file = __DIR__ . '/pages/' . $page . '.php';
 if (is_file($file)) require $file;

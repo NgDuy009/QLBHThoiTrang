@@ -1,7 +1,7 @@
 <?php
 $cfg = array(
  'title' => 'Quản lý sản phẩm',
- 'desc' => 'Quản lý giá, chất liệu, đối tượng và trạng thái công khai. Tạo size/màu trong mục Biến thể; số tồn tự đồng bộ.',
+ 'desc' => '',
  'table' => 'products',
  'search' => 'name LIKE :q OR sku LIKE :q OR collection_name LIKE :q',
  'columns' => array(
@@ -21,6 +21,7 @@ $cfg = array(
  'admin' => true
 );
 $pdo = db();
+require_once __DIR__.'/../includes/palette.php';
 if(!function_exists('wing_admin_product_image')){
     function wing_admin_product_image(?string $src): string {
         $src=trim((string)$src);
@@ -50,13 +51,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'save') {
         if (!is_admin()) { flash('error','Nhân viên chỉ được xem danh mục và thông tin sản phẩm.'); redirect($page); }
         $id=(int)($_POST['id']??0); $data=[];
+        try {
         foreach($cfg['fields'] as [$field,$label,$type,$required]) {
             if ($field==='password') continue;
             if ($type==='image') {
                 $value=trim((string)($_POST['image_url']??''));
                 $oldImage='';
                 if($id>0){$oldStmt=$pdo->prepare("SELECT image_url FROM products WHERE id=?");$oldStmt->execute([$id]);$oldImage=(string)$oldStmt->fetchColumn();}
-                if(!empty($_FILES['image_file']['name'])) {
+                if(isset($_FILES['image_file']) && ($_FILES['image_file']['error']??UPLOAD_ERR_NO_FILE)!==UPLOAD_ERR_NO_FILE) {
                     $file=$_FILES['image_file'];
                     if(($file['error']??UPLOAD_ERR_NO_FILE)!==UPLOAD_ERR_OK) throw new RuntimeException('Không thể tải ảnh lên. Hãy thử lại.');
                     if(($file['size']??0)>5*1024*1024) throw new RuntimeException('Ảnh tối đa 5MB.');
@@ -83,7 +85,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($field==='email' && $value!=='' && !filter_var($value,FILTER_VALIDATE_EMAIL)) { flash('error','Email không hợp lệ.'); redirect($page); }
             $data[$field]=$value===''?null:$value;
         }
+        } catch (RuntimeException $e) {
+            flash('error',$e->getMessage());
+            header('Location: '.BASE_URL.'/index.php?page=products'.($id?'&edit='.$id:'&new=1'));
+            exit;
+        }
+        $createdPaletteImages=[];
         try {
+            $pdo->beginTransaction();
             if ($cfg['table']==='users') {
                 if ($id) {
                     $sql="UPDATE users SET full_name=:full_name,username=:username,role=:role,status=:status";
@@ -102,22 +111,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $pdo->prepare($sql)->execute($data);
                 }
             }
-            flash('success',$id?'Đã cập nhật dữ liệu.':'Đã thêm dữ liệu.');
-            redirect($page);
-         } catch(Throwable $e) { flash('error',$e instanceof RuntimeException?$e->getMessage():'Không thể lưu. Kiểm tra dữ liệu trùng hoặc ràng buộc liên quan.'); redirect($page.($id?'&edit='.$id:'')); }
+            $savedId=$id ?: (int)$pdo->lastInsertId();
+            [$paletteCreated,$paletteUpdated]=wing_palette_save($pdo,$savedId,(string)($data['sku']??''),$_POST,$_FILES['palette_image_file']??[],$createdPaletteImages);
+            $pdo->commit();
+            flash('success',($id?'Đã cập nhật sản phẩm.':'Đã tạo sản phẩm.')." Thêm $paletteCreated tổ hợp size/màu, cập nhật $paletteUpdated nhóm màu.");
+            header('Location: '.BASE_URL.'/index.php?page=products&edit='.$savedId);exit;
+         } catch(Throwable $e) {
+            if($pdo->inTransaction())$pdo->rollBack();
+            foreach($createdPaletteImages as $createdImage) if(is_file($createdImage))@unlink($createdImage);
+            flash('error',$e instanceof RuntimeException?$e->getMessage():'Không thể lưu. Kiểm tra dữ liệu trùng hoặc ràng buộc liên quan (đã import SQL bảng màu chưa?).');
+            header('Location: '.BASE_URL.'/index.php?page=products'.($id?'&edit='.$id:'&new=1'));exit;
+         }
     }
 }
 $record=null;
 if($editId){$st=$pdo->prepare("SELECT * FROM {$cfg['table']} WHERE id=?");$st->execute([$editId]);$record=$st->fetch();}
 $q=trim((string)($_GET['q']??''));
-$sql=$cfg['select']; $params=[];
-if($q!==''){$sql.=" WHERE ".$cfg['search'];$params['q']="%".$q."%";}
-$sql.=" ORDER BY id DESC LIMIT 150";
-$st=$pdo->prepare($sql);$st->execute($params);$rows=$st->fetchAll();
+$editing = is_admin() && ($editId > 0 || isset($_GET['new']));
+$rows=[];
+if(!$editing){
+    $sql=$cfg['select']; $params=[];
+    if($q!==''){$sql.=" WHERE ".$cfg['search'];$params['q']="%".$q."%";}
+    $sql.=" ORDER BY id DESC LIMIT 150";
+    $st=$pdo->prepare($sql);$st->execute($params);$rows=$st->fetchAll();
+}
 ?>
-<section class="page-intro"><div><span class="eyebrow">CATALOGUE / OPERATIONS</span><h2><?= e($cfg['title']) ?></h2><p class="muted"><?= e($cfg['desc']) ?></p><p class="muted">Quy trình: tạo sản phẩm → tạo size/màu trong mục Biến thể → bật Công khai để xuất hiện trên website.</p></div><?php if(is_admin()): ?><a class="btn primary" href="<?= BASE_URL ?>/index.php?page=<?= e($page) ?>&new=1">+ Thêm mới</a><?php endif; ?></section>
+<section class="page-intro"><div><span class="eyebrow">CATALOGUE / OPERATIONS</span><h2><?= e($cfg['title']) ?></h2><?php if($cfg['desc']): ?><p class="muted"><?= e($cfg['desc']) ?></p><?php endif; ?></div><?php if(is_admin()): ?><a class="btn primary" href="<?= BASE_URL ?>/index.php?page=<?= e($page) ?>&new=1">+ Thêm mới</a><?php endif; ?></section>
 <?php if(is_admin() && ($editId || isset($_GET['new']))): ?>
-<section class="card form-card"><div class="card-heading"><h3><?= $record?'Cập nhật':'Thêm mới' ?> · <?= e($cfg['title']) ?></h3><a class="text-link" href="<?= BASE_URL ?>/index.php?page=<?= e($page) ?>">Đóng ×</a></div>
+<section class="card form-card" id="productGeneral"><div class="card-heading"><h3><?= $record?'Cập nhật':'Thêm mới' ?> · <?= e($cfg['title']) ?></h3><a class="text-link" href="<?= BASE_URL ?>/index.php?page=<?= e($page) ?>">Đóng ×</a></div>
+<div class="product-editor-shortcuts"><a href="#productGeneral">01 · Thông tin chung</a><a href="#productPalette">02 · Bảng màu, size & ảnh</a></div>
 <form method="post" enctype="multipart/form-data" class="form-grid product-editor-form"><?= csrf_field() ?><input type="hidden" name="action" value="save"><input type="hidden" name="id" value="<?= (int)($record['id']??0) ?>">
 <?php foreach($cfg['fields'] as [$field,$label,$type,$required]): $val=$record[$field]??''; ?>
 <label class="<?= $type==='textarea'?'span-2':'' ?>"><?= e($label) ?><?php if($type==='textarea'): ?><textarea name="<?= e($field) ?>" rows="3"><?= e($val) ?></textarea>
@@ -125,23 +147,74 @@ $st=$pdo->prepare($sql);$st->execute($params);$rows=$st->fetchAll();
 <?php elseif($type==='status'): ?><select name="<?= e($field) ?>"><option value="active" <?= $val==='active'?'selected':'' ?>>Hoạt động</option><option value="inactive" <?= $val==='inactive'?'selected':'' ?>>Ngừng</option></select>
 <?php elseif($type==='gender'): ?><select name="<?= e($field) ?>" required><option value="women" <?= $val==='women'?'selected':'' ?>>Nữ</option><option value="men" <?= $val==='men'?'selected':'' ?>>Nam</option><option value="unisex" <?= $val==='unisex'?'selected':'' ?>>Unisex</option><option value="kids" <?= $val==='kids'?'selected':'' ?>>Trẻ em</option></select>
 <?php elseif($type==='published'): ?><select name="<?= e($field) ?>"><option value="1" <?= (string)$val==='1'?'selected':'' ?>>Công khai trên website</option><option value="0" <?= (string)$val==='0'?'selected':'' ?>>Bản nháp · Ẩn khỏi website</option></select>
-<?php elseif($type==='image'): ?><div class="image-source-control"><div class="image-source-tabs"><button type="button" class="image-source-tab active" data-target="imageUrlPane">Dán URL</button><button type="button" class="image-source-tab" data-target="imageUploadPane">Tải từ thiết bị</button></div><div id="imageUrlPane"><input type="url" name="image_url" id="productImageUrl" value="<?= e($val) ?>" placeholder="https://example.com/product.jpg"></div><div id="imageUploadPane" hidden><input type="file" name="image_file" id="productImageFile" accept="image/jpeg,image/png,image/webp"><small>JPG, PNG hoặc WEBP · tối đa 5MB</small></div><div class="image-preview-wrap"><img id="productImagePreview" src="<?= e($val ? (preg_match('~^https?://~i',$val)?$val:BASE_URL.'/'.ltrim($val,'/')) : '') ?>" alt="Xem trước ảnh" <?= $val?'':'hidden' ?>><span id="productImageEmpty" <?= $val?'hidden':'' ?>>Xem trước ảnh sản phẩm</span></div></div>
+<?php elseif($type==='image'): ?><div class="image-source-control">
+  <div class="image-source-tabs" role="group" aria-label="Nguồn ảnh sản phẩm">
+    <button type="button" class="image-source-tab active" data-target="imageUploadPane" aria-pressed="true">Tải ảnh từ máy tính</button>
+    <button type="button" class="image-source-tab" data-target="imageUrlPane" aria-pressed="false">Dán URL (tùy chọn)</button>
+  </div>
+  <div id="imageUploadPane"><input type="file" name="image_file" id="productImageFile" accept="image/jpeg,image/png,image/webp"><small>JPG · PNG · WEBP (5 MB)</small></div>
+  <div id="imageUrlPane" hidden><input type="text" name="image_url" id="productImageUrl" value="<?= e($val) ?>" placeholder="Dán link HTTP(S) hoặc để trống" autocomplete="off" spellcheck="false"></div>
+  <div class="image-preview-wrap"><img id="productImagePreview" src="<?= e($val ? (preg_match('~^https?://~i',$val)?$val:BASE_URL.'/'.ltrim($val,'/')) : '') ?>" alt="Xem trước ảnh" <?= $val?'':'hidden' ?>><span id="productImageEmpty" <?= $val?'hidden':'' ?>>Chưa có ảnh</span></div>
+</div>
 <?php elseif($type==='role'): ?><select name="role"><option value="staff" <?= $val==='staff'?'selected':'' ?>>Nhân viên</option><option value="admin" <?= $val==='admin'?'selected':'' ?>>Quản trị viên</option></select>
 <?php else: ?><input type="<?= e($type) ?>" name="<?= e($field) ?>" value="<?= e($val) ?>" <?= $required && !($field==='password' && $record)?'required':'' ?> <?= $type==='number'?'min="0" step="1"':'' ?> placeholder="Nhập <?= e(mb_strtolower($label)) ?>"><?php endif; ?></label>
 <?php endforeach; ?>
-<div class="form-actions span-2"><button class="btn primary" type="submit">Lưu dữ liệu</button><a class="btn light" href="<?= BASE_URL ?>/index.php?page=<?= e($page) ?>">Hủy</a></div>
+<div class="span-2"><?php require __DIR__.'/../includes/palette_editor.php'; ?></div>
+<div class="form-actions span-2 wing-editor-actions"><button class="btn primary wing-save-product" type="submit"><span class="wing-save-icon" aria-hidden="true">✓</span><span class="wing-save-label">LƯU SẢN PHẨM</span></button><span class="wing-save-state" aria-live="polite" hidden>Đang lưu...</span><a class="btn light" href="<?= BASE_URL ?>/index.php?page=<?= e($page) ?>">Hủy</a></div>
 <script>
 (()=>{const url=document.getElementById('productImageUrl'),file=document.getElementById('productImageFile'),preview=document.getElementById('productImagePreview'),empty=document.getElementById('productImageEmpty');
 const show=(src)=>{if(!src){preview.hidden=true;empty.hidden=false;return;}preview.src=src;preview.hidden=false;empty.hidden=true;};
-url?.addEventListener('input',()=>{if(url.value.trim())show(url.value.trim());});
-file?.addEventListener('change',()=>{const f=file.files?.[0];if(f){if(f.size>5*1024*1024){alert('Ảnh tối đa 5MB');file.value='';return;}show(URL.createObjectURL(f));}});
-document.querySelectorAll('.image-source-tab').forEach(btn=>btn.addEventListener('click',()=>{document.querySelectorAll('.image-source-tab').forEach(x=>x.classList.toggle('active',x===btn));document.getElementById('imageUrlPane').hidden=btn.dataset.target!=='imageUrlPane';document.getElementById('imageUploadPane').hidden=btn.dataset.target!=='imageUploadPane';}));
+const initialImage=preview?.getAttribute('src')||'';
+let tempImageUrl=null;
+url?.addEventListener('input',()=>{if(file?.files?.length)return;show(url.value.trim()||initialImage);});
+file?.addEventListener('change',()=>{
+ const f=file.files?.[0];
+ if(tempImageUrl){URL.revokeObjectURL(tempImageUrl);tempImageUrl=null;}
+ if(!f){show(url?.value.trim()||initialImage);return;}
+ if(f.size>5*1024*1024){alert('Ảnh tối đa 5MB');file.value='';show(url?.value.trim()||initialImage);return;}
+ if(!['image/jpeg','image/png','image/webp'].includes(f.type)){alert('Chỉ nhận JPG, PNG hoặc WEBP');file.value='';show(url?.value.trim()||initialImage);return;}
+ tempImageUrl=URL.createObjectURL(f);show(tempImageUrl);
+});
+document.querySelectorAll('.image-source-tab').forEach(btn=>btn.addEventListener('click',()=>{
+ document.querySelectorAll('.image-source-tab').forEach(x=>{const active=x===btn;x.classList.toggle('active',active);x.setAttribute('aria-pressed',String(active));});
+ document.getElementById('imageUrlPane').hidden=btn.dataset.target!=='imageUrlPane';
+ document.getElementById('imageUploadPane').hidden=btn.dataset.target!=='imageUploadPane';
+}));
+const productForm=document.querySelector('.product-editor-form');
+productForm?.addEventListener('submit',(event)=>{
+ if(!productForm.checkValidity())return;
+ const submit=productForm.querySelector('.wing-save-product');
+ if(!submit)return;
+ if(submit.dataset.submitted==='true'){
+   event.preventDefault();return;
+ }
+ submit.dataset.submitted='true';
+ submit.classList.add('is-saving');
+ const label=submit.querySelector('.wing-save-label');
+ if(label)label.textContent='ĐANG LƯU';
+ const state=productForm.querySelector('.wing-save-state');
+ if(state)state.hidden=false;
+ submit.setAttribute('aria-disabled','true');
+}, {capture:true});
+window.addEventListener('pageshow',()=>{
+ const submit=productForm?.querySelector('.wing-save-product');
+ if(!submit)return;
+ delete submit.dataset.submitted;
+ submit.classList.remove('is-saving');
+ submit.removeAttribute('aria-disabled');
+ const label=submit.querySelector('.wing-save-label');
+ if(label)label.textContent='LƯU SẢN PHẨM';
+ const state=productForm.querySelector('.wing-save-state');
+ if(state)state.hidden=true;
+});
 })();
 </script>
 </form></section>
 <?php endif; ?>
+<?php if(!$editing): ?>
 <section class="card"><div class="card-heading"><div><span class="eyebrow">DATA MANAGEMENT</span><h3>Danh sách dữ liệu</h3></div><form class="search-form" method="get"><input type="hidden" name="page" value="<?= e($page) ?>"><input name="q" value="<?= e($q) ?>" placeholder="Tìm kiếm..."><button class="btn light">Tìm</button></form></div>
 <div class="table-wrap"><table><thead><tr><?php foreach($cfg['columns'] as [$field,$label]): ?><th><?= e($label) ?></th><?php endforeach; ?><?php if(is_admin()): ?><th>Thao tác</th><?php endif; ?></tr></thead><tbody>
 <?php foreach($rows as $row): ?><tr><?php foreach($cfg['columns'] as [$field,$label]): ?><td><?php if($field==='image_url'): ?><img class="product-admin-thumb" loading="lazy" src="<?= e(wing_admin_product_image($row['image_url']??'')) ?>" alt="<?= e($row['name']??'Sản phẩm') ?>" onerror="this.onerror=null;this.src='<?= e(BASE_URL) ?>/assets/images/wing-favicon.png';"><?php elseif($field==='price'): ?><?= money($row[$field]) ?><?php elseif($field==='status'): ?><span class="pill <?= e($row[$field]) ?>"><?= $row[$field]==='active'?'Hoạt động':'Ngừng' ?></span><?php elseif($field==='created_at'): ?><?= e(date('d/m/Y',strtotime($row[$field]))) ?><?php elseif($field==='gender'): ?><?= ['women'=>'Nữ','men'=>'Nam','unisex'=>'Unisex','kids'=>'Trẻ em'][$row[$field]]??'—' ?><?php elseif($field==='is_published'): ?><span class="pill <?= (int)$row[$field]===1?'active':'warning' ?>"><?= (int)$row[$field]===1?'Đang trưng bày':'Bản nháp' ?></span><?php else: ?><?= e($row[$field]??'—') ?><?php endif; ?></td><?php endforeach; ?><?php if(is_admin()): ?><td class="actions"><a href="<?= BASE_URL ?>/index.php?page=<?= e($page) ?>&edit=<?= (int)$row['id'] ?>">Sửa</a><form method="post" onsubmit="return confirm('Bạn chắc chắn muốn xóa?')"><?= csrf_field() ?><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?= (int)$row['id'] ?>"><button class="link-danger">Xóa</button></form></td><?php endif; ?></tr><?php endforeach; ?>
 <?php if(!$rows): ?><tr><td colspan="<?= count($cfg['columns'])+(is_admin()?1:0) ?>" class="empty">Không tìm thấy dữ liệu.</td></tr><?php endif; ?>
 </tbody></table></div><div class="table-foot">Hiển thị tối đa 150 bản ghi gần nhất.</div></section>
+<?php endif; ?>

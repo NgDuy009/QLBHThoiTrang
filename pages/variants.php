@@ -1,6 +1,7 @@
 <?php
-$cfg = array('title' => 'Size & màu sắc', 'desc' => 'Quản lý các biến thể theo sản phẩm, kích cỡ và màu sắc.', 'table' => 'product_variants', 'search' => 'size LIKE :q OR color LIKE :q OR sku LIKE :q', 'columns' => array(array('sku', 'SKU biến thể'), array('product_name', 'Sản phẩm'), array('size', 'Size'), array('color', 'Màu'), array('stock_quantity', 'Tồn kho')), 'select' => 'SELECT v.*, p.name AS product_name FROM product_variants v JOIN products p ON p.id=v.product_id', 'fields' => array(array('product_id', 'Sản phẩm', 'product', true), array('sku', 'SKU biến thể', 'text', true), array('size', 'Kích cỡ', 'text', true), array('color', 'Màu sắc', 'text', true), array('image_url', 'Ảnh riêng cho màu (URL, tùy chọn)', 'text', false), array('stock_quantity', 'Số lượng', 'number', true)), 'admin' => false);
+$cfg = array('title' => 'Size & màu sắc', 'desc' => 'Quản lý các biến thể theo sản phẩm, kích cỡ và màu sắc.', 'table' => 'product_variants', 'search' => 'size LIKE :q OR color LIKE :q OR sku LIKE :q', 'columns' => array(array('sku', 'SKU biến thể'), array('product_name', 'Sản phẩm'), array('size', 'Size'), array('color', 'Màu'), array('stock_quantity', 'Tồn kho')), 'select' => 'SELECT v.*, p.name AS product_name FROM product_variants v JOIN products p ON p.id=v.product_id', 'fields' => array(array('product_id', 'Sản phẩm', 'product', true), array('sku', 'SKU biến thể', 'text', true), array('size', 'Kích cỡ', 'text', true), array('color', 'Màu sắc', 'text', true), array('color_hex', 'Mã màu đại diện (HEX)', 'text', false), array('image_url', 'Ảnh riêng cho màu (URL, tùy chọn)', 'text', false), array('stock_quantity', 'Số lượng', 'number', true)), 'admin' => false);
 $pdo = db();
+require_once __DIR__.'/../includes/palette.php';
 $editId = (int)($_GET['edit'] ?? 0);
 $action = $_POST['action'] ?? '';
 function module_options(string $type): array {
@@ -10,6 +11,32 @@ function module_options(string $type): array {
 }
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verify_csrf();
+    if ($action === 'bulk_add') {
+        if(!is_admin()){flash('error','Chỉ Admin được thêm hàng loạt biến thể.');redirect('variants');}
+        $productId=(int)($_POST['product_id']??0);
+        $sizes=array_values(array_unique(array_filter(array_map('trim',preg_split('/[,;\r\n]+/u',(string)($_POST['sizes']??''))))));
+        $colors=array_values(array_unique(array_filter(array_map('trim',preg_split('/[,;\r\n]+/u',(string)($_POST['colors']??''))))));
+        $qty=filter_var($_POST['stock_quantity']??null,FILTER_VALIDATE_INT);
+        if($productId<1||!$sizes||!$colors||count($sizes)*count($colors)>60||$qty===false||$qty<0||$qty>9999){flash('error','Chọn sản phẩm, nhập size và màu (tối đa 60 tổ hợp), tồn kho 0–9999.');redirect('variants');}
+        foreach(array_merge($sizes,$colors) as $v)if(mb_strlen($v)>30){flash('error','Size/màu quá dài; giới hạn 30 ký tự.');redirect('variants');}
+        try {
+            $pdo->beginTransaction();
+            $st=$pdo->prepare('SELECT sku FROM products WHERE id=? FOR UPDATE');$st->execute([$productId]);$sku=$st->fetchColumn();
+            if(!$sku)throw new RuntimeException('Sản phẩm không tồn tại.');
+            $exists=$pdo->prepare('SELECT id FROM product_variants WHERE product_id=? AND size=? AND color=? LIMIT 1');
+            $insert=$pdo->prepare('INSERT INTO product_variants(product_id,sku,size,color,color_hex,stock_quantity) VALUES(?,?,?,?,?,?)');
+            $created=0;$skipped=0;
+            foreach($colors as $color)foreach($sizes as $size){
+                $exists->execute([$productId,$size,$color]);
+                if($exists->fetchColumn()){$skipped++;continue;}
+                $variantSku=substr((string)$sku,0,50).'-'.strtoupper(bin2hex(random_bytes(4)));
+                $insert->execute([$productId,$variantSku,$size,$color,wing_palette_hex($color),$qty]);$created++;
+            }
+            refresh_product_stock($pdo,$productId);
+            $pdo->commit();flash('success',"Đã thêm $created biến thể size/màu; bỏ qua $skipped biến thể đã có. Một sản phẩm hiển thị nhiều lựa chọn màu trên website.");
+        }catch(Throwable $ex){if($pdo->inTransaction())$pdo->rollBack();flash('error','Không thể tạo biến thể. Kiểm tra SKU hoặc dữ liệu.');}
+        redirect('variants');
+    }
     if ($action === 'delete') {
         if (!is_admin()) { flash('error','Chỉ quản trị viên được phép xóa dữ liệu.'); redirect($page); }
         $id=(int)($_POST['id']??0);
@@ -35,6 +62,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             if (in_array($field,['price','cost_price','stock_quantity'],true) && $value!=='' && (!is_numeric($value)|| (float)$value<0)) { flash('error',"{$label} không hợp lệ."); redirect($page); }
             if ($field==='email' && $value!=='' && !filter_var($value,FILTER_VALIDATE_EMAIL)) { flash('error','Email không hợp lệ.'); redirect($page); }
+            if($field==='color_hex' && $value!==''){
+                $value=strtoupper($value);
+                if(!preg_match('/^#[0-9A-F]{6}$/',$value)){flash('error','Mã màu cần có dạng #FFFFFF.');redirect('variants');}
+            }
+            if($field==='color_hex' && $value==='')$value=wing_palette_hex((string)($_POST['color']??''));
             $data[$field]=$value===''?null:$value;
         }
         try {
@@ -77,6 +109,10 @@ $sql.=" ORDER BY id DESC LIMIT 150";
 $st=$pdo->prepare($sql);$st->execute($params);$rows=$st->fetchAll();
 ?>
 <section class="page-intro"><div><span class="eyebrow">CATALOGUE / OPERATIONS</span><h2><?= e($cfg['title']) ?></h2><p class="muted"><?= e($cfg['desc']) ?> Tổng tồn sản phẩm được tính từ các biến thể.</p></div><?php if(is_admin()): ?><a class="btn primary" href="<?= BASE_URL ?>/index.php?page=<?= e($page) ?>&new=1">+ Thêm mới</a><?php endif; ?></section>
+<?php if(is_admin()): ?>
+<section class="card wing-bulk-variants"><div class="card-heading"><div><span class="eyebrow">ONE PRODUCT · MULTIPLE COLORS</span><h3>Gộp lựa chọn size và màu trong cùng một sản phẩm</h3><p class="muted">Chọn một mã sản phẩm; thêm màu và size vào mã đó, không cần tạo nhiều sản phẩm trùng nhau. Biến thể đã tồn tại sẽ được bỏ qua.</p></div></div>
+<form method="post" class="form-grid"><?= csrf_field() ?><input type="hidden" name="action" value="bulk_add"><label>SẢN PHẨM GỐC<select name="product_id" required><option value="">Chọn sản phẩm...</option><?php foreach(module_options('product') as $item): ?><option value="<?= (int)$item['id'] ?>"><?= e($item['name']) ?></option><?php endforeach; ?></select></label><label>TỒN KHO MỖI TỔ HỢP<input type="number" min="0" max="9999" name="stock_quantity" value="5" required></label><label>SIZE (cách nhau bằng dấu phẩy)<input name="sizes" placeholder="XS, S, M, L, XL hoặc One Size" required></label><label>MÀU SẮC (cách nhau bằng dấu phẩy)<input name="colors" placeholder="Đen, Trắng, Be, Nâu..." required></label><div class="span-2"><button type="submit" class="btn primary">+ TẠO CÁC BIẾN THỂ SIZE / MÀU</button><p class="muted">Sau khi tạo, bạn có thể sửa từng biến thể để thêm ảnh riêng cho màu sắc.</p></div></form></section>
+<?php endif; ?>
 <?php if(is_admin() && ($editId || isset($_GET['new']))): ?>
 <section class="card form-card"><div class="card-heading"><h3><?= $record?'Cập nhật':'Thêm mới' ?> · <?= e($cfg['title']) ?></h3><a class="text-link" href="<?= BASE_URL ?>/index.php?page=<?= e($page) ?>">Đóng ×</a></div>
 <form method="post" class="form-grid"><?= csrf_field() ?><input type="hidden" name="action" value="save"><input type="hidden" name="id" value="<?= (int)($record['id']??0) ?>">

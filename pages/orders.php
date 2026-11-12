@@ -35,13 +35,40 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
         }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();flash('error',$e instanceof RuntimeException?$e->getMessage():'Không thể tạo đơn. Kiểm tra dữ liệu và tồn kho.');}
         redirect('orders');
     }
+    if(($_POST['action']??'')==='verify_bank'){
+        if(!is_admin()) {flash('error','Chỉ Admin được xác nhận tiền thực nhận.');redirect('orders');}
+        $id=(int)($_POST['id']??0);
+        try {
+            $pdo->beginTransaction();
+            $st=$pdo->prepare('SELECT id,order_code,customer_id,payment_status,payment_method,payment_claimed_at,status FROM orders WHERE id=? FOR UPDATE');
+            $st->execute([$id]);$bank=$st->fetch();
+            if(!$bank||$bank['payment_method']!=='bank_transfer'||$bank['status']==='cancelled'||$bank['payment_status']!=='unpaid'||empty($bank['payment_claimed_at']))
+                throw new RuntimeException('Đơn chưa gửi xác nhận chuyển khoản hoặc không còn hợp lệ.');
+            $pdo->prepare("UPDATE orders SET payment_status='paid',payment_verified_at=NOW(),payment_verified_by=?,status=CASE WHEN status='pending' THEN 'confirmed' ELSE status END WHERE id=?")
+                ->execute([(int)current_user()['id'],$id]);
+            $pdo->commit();
+            if($bank['customer_id'])wing_notify($pdo,'customer',(int)$bank['customer_id'],'payment_verified','Đã nhận thanh toán '.$bank['order_code'],'WinG đã đối soát và xác nhận giao dịch chuyển khoản của bạn.','index.php?page=customer_order_detail&id='.$id,'payment-verified:'.$id);
+            flash('success','Đã ghi nhận giao dịch sau khi kiểm tra sao kê ngân hàng. Đơn hàng được chuyển sang bước xác nhận xử lý.');
+        }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();flash('error',$e->getMessage());}
+        redirect('orders');
+    }
+    if(($_POST['action']??'')==='update_shipping'){
+        $id=(int)($_POST['id']??0);
+        $carrier=trim((string)($_POST['shipping_carrier']??''));$tracking=trim((string)($_POST['tracking_code']??''));
+        if(mb_strlen($carrier)>100||mb_strlen($tracking)>100){flash('error','Thông tin vận đơn tối đa 100 ký tự.');redirect('orders');}
+        $st=$pdo->prepare("UPDATE orders SET shipping_carrier=?,tracking_code=? WHERE id=? AND status IN ('confirmed','shipping')");
+        $st->execute([$carrier?:null,$tracking?:null,$id]);
+        if(!$st->rowCount())flash('error','Chỉ được cập nhật vận đơn đã xác nhận hoặc đang giao.');
+        else flash('success','Đã cập nhật mã vận đơn cho khách hàng.');
+        header('Location: '.BASE_URL.'/index.php?page=order_detail&id='.$id);exit;
+    }
     if(($_POST['action']??'')==='status'){
         $id=(int)($_POST['id']??0);$status=(string)($_POST['status']??'');
         try{
             set_order_status($pdo,$id,$status);
             $st=$pdo->prepare("SELECT order_code,customer_id FROM orders WHERE id=?");$st->execute([$id]);$updatedOrder=$st->fetch();
             if($updatedOrder&&$updatedOrder['customer_id']){
-                $statusText=['pending'=>'đang chờ xác nhận','confirmed'=>'đã được xác nhận','completed'=>'đã hoàn thành','cancelled'=>'đã bị hủy'][$status]??$status;
+                $statusText=['pending'=>'đang chờ xác nhận','confirmed'=>'đã được xác nhận','shipping'=>'đang được vận chuyển','completed'=>'đã hoàn thành','cancelled'=>'đã bị hủy'][$status]??$status;
                 wing_notify($pdo,'customer',(int)$updatedOrder['customer_id'],'order_status','Cập nhật đơn hàng '.$updatedOrder['order_code'],'Đơn hàng của bạn '.$statusText.'.','index.php?page=customer_order_detail&id='.$id,'order-status:'.$id.':'.$status);
                 if($status==='completed')wing_notify_completed_order_reviews($pdo,$id);
             }
@@ -61,6 +88,54 @@ $orders=$pdo->query("SELECT o.*,c.full_name customer,u.full_name staff FROM orde
 <div id="orderItems" class="order-items"><div class="order-item"><select name="variant_id[]" required><option value="">-- Sản phẩm · size · màu --</option><?php foreach($variants as $v): ?><option value="<?= (int)$v['id'] ?>" data-price="<?= (float)$v['price'] ?>" data-stock="<?= (int)$v['stock_quantity'] ?>"><?= e($v['name'].' · '.$v['size'].' · '.$v['color'].' · tồn '.$v['stock_quantity']) ?></option><?php endforeach; ?></select><input name="quantity[]" type="number" min="1" value="1" required><button type="button" class="remove-item" aria-label="Xóa dòng">×</button></div></div>
 <div class="order-bottom"><button type="button" class="btn light" id="addOrderItem">+ Thêm sản phẩm</button><div class="total-preview">Tổng tạm tính <strong id="orderTotal">0 ₫</strong></div></div>
 <button class="btn primary" type="submit">Xác nhận đơn tại quầy →</button></form></section>
-<section class="card"><div class="card-heading"><div><span class="eyebrow">CENTRAL ORDER REGISTER</span><h3>Tất cả đơn hàng</h3></div><span class="pill active"><?= count($orders) ?> đơn gần nhất</span></div><div class="table-wrap"><table><thead><tr><th>Mã đơn</th><th>Nguồn</th><th>Khách hàng</th><th>Phụ trách</th><th>Ngày tạo</th><th>Tổng tiền</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>
-<?php foreach($orders as $o): ?><tr><td><b><?= e($o['order_code']) ?></b></td><td><span class="pill <?= $o['source']==='online'?'confirmed':'active' ?>"><?= $o['source']==='online'?'Website':'Tại quầy' ?></span></td><td><?= e($o['customer']??'Khách lẻ') ?></td><td><?= e($o['staff']?:'Online Store') ?></td><td><?= date('d/m/Y H:i',strtotime($o['created_at'])) ?></td><td><?= money($o['total_amount']) ?></td><td><span class="pill <?= e($o['status']) ?>"><?= e(order_status_label($o['status'])) ?></span></td><td class="actions"><a href="<?= BASE_URL ?>/index.php?page=order_detail&id=<?= (int)$o['id'] ?>">Chi tiết</a><?php if($o['status']!=='cancelled'&&$o['status']!=='completed'): ?><form method="post" class="inline-status"><?= csrf_field() ?><input type="hidden" name="action" value="status"><input type="hidden" name="id" value="<?= (int)$o['id'] ?>"><select name="status"><option value="confirmed" <?= $o['status']==='confirmed'?'selected':'' ?>>Xác nhận</option><option value="completed">Hoàn thành</option><option value="cancelled">Hủy</option></select><button class="link-danger">Lưu</button></form><?php endif; ?></td></tr><?php endforeach; ?>
-<?php if(!$orders): ?><tr><td colspan="8" class="empty">Chưa có đơn hàng.</td></tr><?php endif; ?></tbody></table></div></section>
+<section class="card"><div class="card-heading"><div><span class="eyebrow">CENTRAL ORDER REGISTER</span><h3>Tất cả đơn hàng</h3></div><span class="pill active"><?= count($orders) ?> đơn gần nhất</span></div><div class="table-wrap"><table><thead><tr><th>Mã đơn</th><th>Nguồn</th><th>Khách hàng</th><th>Phụ trách</th><th>Ngày tạo</th><th>Tổng tiền</th><th>Thanh toán</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>
+<?php foreach($orders as $o): ?>
+<?php 
+    $paymentText = ($o['payment_status']==='paid')
+        ? '✓ Đã nhận tiền'
+        : (($o['payment_method']==='cod')
+            ? 'COD · thu khi giao'
+            : (!empty($o['payment_claimed_at']) ? 'Khách đã gửi xác nhận · chờ đối soát' : 'Chờ khách chuyển khoản'));
+    $statusOptions=[];
+    if($o['status']==='pending') $statusOptions=['confirmed'=>'Đã xác nhận đơn hàng','cancelled'=>'Hủy đơn'];
+    elseif($o['status']==='confirmed') $statusOptions=['shipping'=>'Đã giao hàng','completed'=>'Khách đã nhận hàng','cancelled'=>'Hủy đơn'];
+    elseif($o['status']==='shipping') $statusOptions=['completed'=>'Khách đã nhận hàng'];
+?>
+<tr>
+<td><b><?= e($o['order_code']) ?></b></td>
+<td><span class="pill <?= $o['source']==='online'?'confirmed':'active' ?>"><?= $o['source']==='online'?'Website':'Tại quầy' ?></span></td>
+<td><?= e($o['customer']??'Khách lẻ') ?></td>
+<td><?= e($o['staff']?:'Online Store') ?></td>
+<td><?= date('d/m/Y H:i',strtotime($o['created_at'])) ?></td>
+<td><?= money($o['total_amount']) ?></td>
+<td>
+  <span class="payment-status-label"><?= e($paymentText) ?></span>
+  <?php if(is_admin()&&$o['payment_method']==='bank_transfer'&&$o['payment_status']==='unpaid'&&!empty($o['payment_claimed_at'])&&$o['status']!=='cancelled'): ?>
+    <form method="post" onsubmit="return confirm('Xác nhận bạn ĐÃ KIỂM TRA sao kê và số tiền thực nhận?')">
+      <?= csrf_field() ?>
+      <input type="hidden" name="action" value="verify_bank">
+      <input type="hidden" name="id" value="<?= (int)$o['id'] ?>">
+      <button class="btn light">ĐÃ NHẬN TIỀN / XÁC NHẬN ĐƠN ✓</button>
+    </form>
+  <?php endif; ?>
+</td>
+<td><span class="pill <?= e($o['status']) ?>"><?= e(order_status_label($o['status'])) ?></span></td>
+<td class="actions">
+  <a href="<?= BASE_URL ?>/index.php?page=order_detail&id=<?= (int)$o['id'] ?>">Chi tiết</a>
+  <?php if($o['status']!=='cancelled'&&$o['status']!=='completed'&&$statusOptions): ?>
+    <form method="post" class="inline-status">
+      <?= csrf_field() ?>
+      <input type="hidden" name="action" value="status">
+      <input type="hidden" name="id" value="<?= (int)$o['id'] ?>">
+      <select name="status">
+        <?php foreach($statusOptions as $statusValue=>$statusLabel): ?>
+          <option value="<?= e($statusValue) ?>"><?= e($statusLabel) ?></option>
+        <?php endforeach; ?>
+      </select>
+      <button class="link-danger">Lưu</button>
+    </form>
+  <?php endif; ?>
+</td>
+</tr>
+<?php endforeach; ?>
+<?php if(!$orders): ?><tr><td colspan="9" class="empty">Chưa có đơn hàng.</td></tr><?php endif; ?></tbody></table></div></section>

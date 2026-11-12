@@ -6,10 +6,10 @@ function login_user(string $username, string $password): bool {
     $stmt = db()->prepare('SELECT id, full_name, username, password_hash, role, status FROM users WHERE username = ? LIMIT 1');
     $stmt->execute([$username]);
     $user = $stmt->fetch();
-    if (!$user || $user['status'] !== 'active' || !password_verify($password, $user['password_hash'])) return false;
+    if (!$user || $user['status'] !== 'active' || !in_array($user['role'], ['admin','staff'], true) || !password_verify($password, $user['password_hash'])) return false;
     session_regenerate_id(true);
     unset($_SESSION['customer_id']);
-    unset($_SESSION['wing_cart_v2']);
+    unset($_SESSION['wing_cart_v2'], $_SESSION['wing_guest_cart']);
     unset($user['password_hash']);
     $_SESSION['user'] = $user;
     return true;

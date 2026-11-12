@@ -9,7 +9,21 @@ function redirect(string $page): never {
     header('Location: ' . BASE_URL . '/index.php?page=' . urlencode($page));
     exit;
 }
-function current_user(): ?array { return $_SESSION['user'] ?? null; }
+function current_user(): ?array {
+    static $checked=false, $valid=null;
+    if ($checked) return $valid;
+    $checked=true;
+    $sessionUser=$_SESSION['user']??null;
+    if (!is_array($sessionUser) || empty($sessionUser['id'])) return null;
+    $st=db()->prepare('SELECT id, full_name, username, role, status FROM users WHERE id=?');
+    $st->execute([(int)$sessionUser['id']]);
+    $row=$st->fetch();
+    if (!$row || $row['status']!=='active' || !in_array($row['role'],['admin','staff'],true)) {
+        unset($_SESSION['user']); return null;
+    }
+    $_SESSION['user']=$row;
+    return $valid=$row;
+}
 function is_logged_in(): bool { return current_user() !== null; }
 function require_login(): void {
     if (!is_logged_in()) redirect('login');

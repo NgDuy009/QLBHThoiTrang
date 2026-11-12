@@ -11,15 +11,26 @@ function refresh_product_stock(PDO $pdo, int $productId): void {
  * once only; cancelled orders cannot be reopened through this basic workflow.
  */
 function set_order_status(PDO $pdo, int $orderId, string $newStatus): void {
-    $allowed=['pending','confirmed','completed','cancelled'];
+    $allowed=['pending','confirmed','shipping','completed','cancelled'];
     if(!in_array($newStatus,$allowed,true)) throw new RuntimeException('Trạng thái đơn hàng không hợp lệ.');
     $pdo->beginTransaction();
     try {
-        $st=$pdo->prepare("SELECT id,status FROM orders WHERE id=? FOR UPDATE");
+        $st=$pdo->prepare("SELECT id,status,payment_status,payment_method FROM orders WHERE id=? FOR UPDATE");
         $st->execute([$orderId]);$order=$st->fetch();
         if(!$order) throw new RuntimeException('Không tìm thấy đơn hàng.');
-        if($order['status']==='cancelled' && $newStatus!=='cancelled') throw new RuntimeException('Đơn đã hủy không thể mở lại; hãy tạo đơn mới.');
-        if($newStatus==='cancelled' && $order['status']==='completed') throw new RuntimeException('Đơn đã hoàn thành không thể hủy trong quy trình cơ bản.');
+        $transitions=[
+            'pending'=>['confirmed','cancelled'],
+            'confirmed'=>['shipping','completed','cancelled'],
+            'shipping'=>['completed'],
+            'completed'=>[], 'cancelled'=>[],
+        ];
+        if($newStatus===$order['status']){$pdo->commit();return;}
+        if(!in_array($newStatus,$transitions[$order['status']]??[],true))
+            throw new RuntimeException('Không thể chuyển trạng thái đơn hàng theo quy trình hiện tại.');
+        if($newStatus==='cancelled' && $order['payment_status']==='paid')
+            throw new RuntimeException('Đơn đã thanh toán cần hoàn tiền/đối soát trước khi hủy.');
+        if(in_array($newStatus,['shipping','completed'],true) && $order['payment_method']==='bank_transfer' && $order['payment_status']!=='paid')
+            throw new RuntimeException('Vui lòng kiểm tra và xác nhận tiền đã nhận trước khi giao/hoàn tất đơn chuyển khoản.');
         if($newStatus==='cancelled' && $order['status']!=='cancelled') {
             $st=$pdo->prepare("SELECT product_id,variant_id,quantity FROM order_details WHERE order_id=?");
             $st->execute([$orderId]);$affected=[];
@@ -47,10 +58,44 @@ function set_order_status(PDO $pdo, int $orderId, string $newStatus): void {
                 if((int)$check->fetchColumn()>0) refresh_product_stock($pdo,(int)$pid);
             }
         }
-        $pdo->prepare("UPDATE orders SET status=?,payment_status=IF(?='cancelled' AND payment_status='paid','refunded',payment_status) WHERE id=?")->execute([$newStatus,$newStatus,$orderId]);
+        $pdo->prepare("UPDATE orders SET status=?,payment_status=CASE WHEN ?='completed' AND payment_method='cod' THEN 'paid' ELSE payment_status END WHERE id=?")->execute([$newStatus,$newStatus,$orderId]);
         $pdo->commit();
     } catch(Throwable $e) {
         if($pdo->inTransaction())$pdo->rollBack();
         throw $e;
     }
+}
+
+/** A customer's shopping bag is persisted under their ID, never shared by browser session. */
+function wing_cart_get(PDO $pdo, ?array $customer): array {
+    if ($customer) {
+        $st=$pdo->prepare('SELECT variant_id, quantity FROM customer_cart_items WHERE customer_id=?');
+        $st->execute([(int)$customer['id']]);
+        $items=[];
+        foreach ($st->fetchAll() as $item) $items[(int)$item['variant_id']] = (int)$item['quantity'];
+        return $items;
+    }
+    return $_SESSION['wing_guest_cart'] ?? [];
+}
+function wing_cart_set(PDO $pdo, ?array $customer, int $variantId, int $qty): void {
+    if ($variantId < 1 || $qty < 0 || $qty > 20) throw new RuntimeException('Số lượng không hợp lệ.');
+    if ($customer) {
+        if ($qty === 0) {
+            $pdo->prepare('DELETE FROM customer_cart_items WHERE customer_id=? AND variant_id=?')
+                ->execute([(int)$customer['id'],$variantId]);
+        } else {
+            $pdo->prepare('INSERT INTO customer_cart_items(customer_id,variant_id,quantity) VALUES(?,?,?) ON DUPLICATE KEY UPDATE quantity=VALUES(quantity)')
+                ->execute([(int)$customer['id'],$variantId,$qty]);
+        }
+    } elseif ($qty === 0) unset($_SESSION['wing_guest_cart'][$variantId]);
+    else $_SESSION['wing_guest_cart'][$variantId] = $qty;
+}
+function wing_cart_clear(PDO $pdo, ?array $customer): void {
+    if ($customer) $pdo->prepare('DELETE FROM customer_cart_items WHERE customer_id=?')->execute([(int)$customer['id']]);
+    else unset($_SESSION['wing_guest_cart']);
+}
+function wing_payment_reference(): string {
+    $alphabet='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    $code=''; for ($i=0; $i<8; $i++) $code.=$alphabet[random_int(0,strlen($alphabet)-1)];
+    return $code;
 }
